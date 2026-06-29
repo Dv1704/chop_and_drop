@@ -1,0 +1,228 @@
+@import "tailwindcss";
+
+/* ── Design System Tokens ─────────────────────────────────────────────────── */
+@theme {
+  --color-suya-smoke:    #1A1008;
+  --color-palm-oil:      #C4521A;
+  --color-egusi-cream:   #F2E8D5;
+  --color-plantain-gold: #E8A020;
+  --color-stew-red:      #8B2000;
+  --color-ash-white:     #FAF6F0;
+  --color-warm-dark:     #2E1A0A;
+
+  --font-display: var(--font-unbounded), sans-serif;
+  --font-body:    var(--font-dm-sans), sans-serif;
+  --font-price:   var(--font-space-mono), monospace;
+}
+
+/* ── CSS Custom Properties ────────────────────────────────────────────────── */
+:root {
+  --suya-smoke:    #1A1008;
+  --palm-oil:      #C4521A;
+  --egusi-cream:   #F2E8D5;
+  --plantain-gold: #E8A020;
+  --stew-red:      #8B2000;
+  --ash-white:     #FAF6F0;
+  --warm-dark:     #2E1A0A;
+
+  --shadow-warm: 0 4px 24px rgba(196, 82, 26, 0.15);
+  --shadow-card: 0 2px 16px rgba(196, 82, 26, 0.10);
+
+  --gradient-cta:  linear-gradient(90deg, #C4521A, #E8A020);
+  --gradient-dark: linear-gradient(180deg, #1A1008, #2E1A0A);
+  --gradient-card: linear-gradient(180deg, #F2E8D5, #FAF6F0);
+}
+
+/* ── Base Reset ───────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--egusi-cream);
+  color: var(--suya-smoke);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--palm-oil);
+  outline-offset: 2px;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+@media (min-width: 1024px) {
+  .container { padding: 0 48px; }
+}
+@media (max-width: 768px) {
+  .container { padding: 0 20px; }
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--gradient-cta);
+  color: var(--ash-white);
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: transparent;
+  color: var(--ash-white);
+  font-weight: 600;
+  font-size: 15px;
+  border: 2px solid var(--ash-white);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.btn-outline:hover { background: rgba(250,246,240,0.12); }
+
+.btn-stew {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--stew-red);
+  color: var(--ash-white);
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.btn-stew:hover { opacity: 0.88; }
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--ash-white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-warm);
+}
+
+/* ── Pill Badge ───────────────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Suya Glow (hero radial warm effect) ─────────────────────────────────── */
+.suya-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 70% 50%, rgba(196,82,26,0.15) 0%, transparent 65%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--egusi-cream); }
+::-webkit-scrollbar-thumb { background: var(--palm-oil); border-radius: 999px; }
+
+/* ── Selection ────────────────────────────────────────────────────────────── */
+::selection {
+  background: rgba(196, 82, 26, 0.25);
+  color: var(--suya-smoke);
+}
+
+/* ── Professional micro-interactions ─────────────────────────────────────── */
+a, button { -webkit-tap-highlight-color: transparent; }
+
+.card:hover .menu-card-img {
+  transform: scale(1.06);
+}
+
+/* Subtle underline animation for links */
+.nav-link { position: relative; }
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--palm-oil);
+  border-radius: 1px;
+  transition: width 0.25s ease;
+}
+.nav-link:hover::after { width: 100%; }
+
+/* Input caret colour */
+input { caret-color: var(--palm-oil); }
+
+/* Smooth appearance for page sections */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp 0.55s ease both; }
+
+/* Consistent border-radius for images inside cards */
+.card img { border-radius: 0; }
+
+/* Better button box-shadow on focus for accessibility */
+.btn-primary:focus-visible,
+.btn-stew:focus-visible,
+.btn-outline:focus-visible {
+  outline: 3px solid var(--plantain-gold);
+  outline-offset: 3px;
+}
+
+/* Loading shimmer for image placeholders */
+@keyframes shimmer {
+  from { background-position: -400px 0; }
+  to   { background-position: 400px 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #e8dcc8 25%, #f2e8d5 50%, #e8dcc8 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
