@@ -91,22 +91,34 @@ export async function POST(req: NextRequest) {
 }
 
 // GET /api/orders?id=xxx
+// Accepts either a full UUID (36 chars) or the 8-char short reference shown
+// on the confirmation page / WhatsApp message.
 export async function GET(req: NextRequest) {
   if (!supabaseReady) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   }
 
-  const id = req.nextUrl.searchParams.get('id');
-  if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
-    return NextResponse.json({ error: 'Invalid or missing order id' }, { status: 400 });
+  const raw = req.nextUrl.searchParams.get('id')?.trim() ?? '';
+  const id  = raw.toLowerCase();
+
+  const isFullUuid  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
+  const isShortRef  = /^[0-9a-f]{8}$/.test(id);
+
+  if (!isFullUuid && !isShortRef) {
+    return NextResponse.json({ error: 'Enter your 8-character Order ID or the full UUID.' }, { status: 400 });
   }
 
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*, order_items(*)')
-    .eq('id', id)
-    .single();
+  let query = supabase.from('orders').select('*, order_items(*)');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
+  if (isFullUuid) {
+    query = query.eq('id', id);
+  } else {
+    // Prefix-match on the UUID cast to text — PostgREST supports column::type in filters
+    query = query.filter('id::text', 'ilike', `${id}%`);
+  }
+
+  const { data, error } = await query.limit(1).single();
+
+  if (error || !data) return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
   return NextResponse.json(data);
 }

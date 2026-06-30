@@ -24,8 +24,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Payment not configured' }, { status: 503 });
     }
 
-    const reference = `CD-${orderId.slice(0, 8)}-${Date.now()}`;
-    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/payments/callback?reference=${reference}&orderId=${orderId}`;
+    // ── Guard: reject if this order already has a captured payment ────────────
+    // Prevents a user from being charged twice for the same order (e.g. if they
+    // call initialize again after already paying, or open two tabs).
+    if (supabaseReady) {
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('order_id', orderId)
+        .eq('status', 'captured')
+        .maybeSingle();
+
+      if (existingPayment) {
+        return NextResponse.json(
+          { error: 'This order has already been paid.' },
+          { status: 409 }
+        );
+      }
+    }
+
+    const reference   = `CD-${orderId.slice(0, 8)}-${Date.now()}`;
+    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/payments/callback?orderId=${orderId}`;
 
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -35,18 +54,21 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         email,
-        amount: amountKobo,
-        currency: 'NGN',
+        amount:       amountKobo,
+        currency:     'NGN',
         reference,
         callback_url: callbackUrl,
-        metadata: { orderId, custom_fields: [{ display_name: 'Order ID', variable_name: 'order_id', value: orderId }] },
+        metadata: {
+          orderId,
+          custom_fields: [{ display_name: 'Order ID', variable_name: 'order_id', value: orderId }],
+        },
       }),
     });
 
     const json = await res.json();
     if (!json.status) throw new Error(json.message ?? 'Paystack error');
 
-    // Save payment record (best-effort — don't fail the checkout if DB insert fails)
+    // Save pending payment row (best-effort — doesn't block checkout if DB is slow)
     if (supabaseReady) {
       const { error: pmtErr } = await supabase.from('payments').insert({
         order_id:           orderId,
@@ -60,8 +82,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       authorizationUrl: json.data.authorization_url,
-      reference: json.data.reference,
-      accessCode: json.data.access_code,
+      reference:        json.data.reference,
+      accessCode:       json.data.access_code,
     });
   } catch (err: unknown) {
     const message = sbErr(err);

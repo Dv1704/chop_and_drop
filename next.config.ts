@@ -6,7 +6,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com",
-  "connect-src 'self' https://api.paystack.co https://checkout.paystack.com https://*.supabase.co wss://*.supabase.co https://api.openai.com",
+  "connect-src 'self' https://api.paystack.co https://checkout.paystack.com https://*.supabase.co wss://*.supabase.co https://api.openai.com https://graph.facebook.com",
   "frame-src https://checkout.paystack.com",
   "object-src 'none'",
   "base-uri 'self'",

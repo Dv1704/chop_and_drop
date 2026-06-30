@@ -1,24 +1,98 @@
 'use client';
 
-import { createContext, useContext, useReducer, ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { CartItem, MenuItem, FulfillmentMode } from '@/types';
 
+// ── Persistence ───────────────────────────────────────────────────────────────
+// Cart is stored in localStorage under this key.
+// Bump CART_VERSION whenever CartItem or CartState shape changes —
+// stale entries are silently discarded.
+const CART_KEY     = 'cnd_cart_v1';
+const CART_VERSION = 1;
+
+const DEFAULT_STATE: CartState = { items: [], mode: 'delivery', deliveryAddress: '' };
+
+// ── Shape validators (prevents corrupted / tampered localStorage crashing the app)
+function isValidMenuItem(v: unknown): v is MenuItem {
+  if (!v || typeof v !== 'object') return false;
+  const m = v as Record<string, unknown>;
+  return (
+    typeof m.id       === 'string' && m.id.length > 0 &&
+    typeof m.name     === 'string' && m.name.length > 0 &&
+    typeof m.price    === 'number' && m.price >= 0 &&
+    typeof m.category === 'string'
+  );
+}
+
+function isValidCartItem(v: unknown): v is CartItem {
+  if (!v || typeof v !== 'object') return false;
+  const i = v as Record<string, unknown>;
+  return (
+    typeof i.id        === 'string'  && i.id.length > 0 &&
+    typeof i.qty       === 'number'  && i.qty > 0 && i.qty <= 99 &&
+    typeof i.unitPrice === 'number'  && i.unitPrice >= 0 &&
+    isValidMenuItem(i.menuItem)
+  );
+}
+
+function loadFromStorage(): CartState {
+  if (typeof window === 'undefined') return DEFAULT_STATE;
+  try {
+    const raw = localStorage.getItem(CART_KEY);
+    if (!raw) return DEFAULT_STATE;
+    const parsed: Record<string, unknown> = JSON.parse(raw);
+
+    // Version gate — rejects data from older schemas
+    if (parsed.version !== CART_VERSION) return DEFAULT_STATE;
+
+    const items = Array.isArray(parsed.items)
+      ? parsed.items.filter(isValidCartItem)
+      : [];
+
+    return {
+      items,
+      mode:            parsed.mode === 'pickup' ? 'pickup' : 'delivery',
+      deliveryAddress: typeof parsed.deliveryAddress === 'string'
+        ? parsed.deliveryAddress.slice(0, 500)
+        : '',
+    };
+  } catch {
+    // Corrupt JSON — discard silently
+    return DEFAULT_STATE;
+  }
+}
+
+function saveToStorage(state: CartState) {
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify({ ...state, version: CART_VERSION }));
+  } catch {
+    // localStorage full or blocked (private browsing with strict settings) — ignore
+  }
+}
+
+// ── State + Actions ───────────────────────────────────────────────────────────
+
 interface CartState {
-  items: CartItem[];
-  mode: FulfillmentMode;
+  items:           CartItem[];
+  mode:            FulfillmentMode;
   deliveryAddress: string;
 }
 
 type CartAction =
-  | { type: 'ADD_ITEM'; item: MenuItem }
-  | { type: 'REMOVE_ITEM'; id: string }
-  | { type: 'UPDATE_QTY'; id: string; qty: number }
+  | { type: 'HYDRATE';      state: CartState }
+  | { type: 'ADD_ITEM';     item: MenuItem }
+  | { type: 'REMOVE_ITEM';  id: string }
+  | { type: 'UPDATE_QTY';   id: string; qty: number }
   | { type: 'CLEAR' }
-  | { type: 'SET_MODE'; mode: FulfillmentMode }
-  | { type: 'SET_ADDRESS'; address: string };
+  | { type: 'SET_MODE';     mode: FulfillmentMode }
+  | { type: 'SET_ADDRESS';  address: string };
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
+
+    case 'HYDRATE':
+      return action.state;
+
     case 'ADD_ITEM': {
       const existing = state.items.find((i) => i.menuItem.id === action.item.id);
       if (existing) {
@@ -33,17 +107,14 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: [
           ...state.items,
-          {
-            id: crypto.randomUUID(),
-            menuItem: action.item,
-            qty: 1,
-            unitPrice: action.item.price,
-          },
+          { id: crypto.randomUUID(), menuItem: action.item, qty: 1, unitPrice: action.item.price },
         ],
       };
     }
+
     case 'REMOVE_ITEM':
       return { ...state, items: state.items.filter((i) => i.id !== action.id) };
+
     case 'UPDATE_QTY':
       return {
         ...state,
@@ -51,60 +122,77 @@ function cartReducer(state: CartState, action: CartAction): CartState {
           ? state.items.filter((i) => i.id !== action.id)
           : state.items.map((i) => (i.id === action.id ? { ...i, qty: action.qty } : i)),
       };
+
     case 'CLEAR':
       return { ...state, items: [] };
+
     case 'SET_MODE':
       return { ...state, mode: action.mode };
+
     case 'SET_ADDRESS':
       return { ...state, deliveryAddress: action.address };
+
     default:
       return state;
   }
 }
 
-const DELIVERY_FEE = 1500;
+// ── Context ───────────────────────────────────────────────────────────────────
 
 interface CartContextValue {
-  items: CartItem[];
-  mode: FulfillmentMode;
-  deliveryAddress: string;
-  itemCount: number;
-  subtotal: number;
-  deliveryFee: number;
-  total: number;
-  addItem: (item: MenuItem) => void;
-  removeItem: (id: string) => void;
-  updateQty: (id: string, qty: number) => void;
-  clear: () => void;
-  setMode: (mode: FulfillmentMode) => void;
+  items:              CartItem[];
+  mode:               FulfillmentMode;
+  deliveryAddress:    string;
+  itemCount:          number;
+  subtotal:           number;
+  deliveryFee:        number;
+  total:              number;
+  addItem:            (item: MenuItem) => void;
+  removeItem:         (id: string) => void;
+  updateQty:          (id: string, qty: number) => void;
+  clear:              () => void;
+  setMode:            (mode: FulfillmentMode) => void;
   setDeliveryAddress: (address: string) => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(cartReducer, {
-    items: [],
-    mode: 'delivery',
-    deliveryAddress: '',
-  });
+const DELIVERY_FEE = 1500;
 
-  const subtotal = state.items.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
+export function CartProvider({ children }: { children: ReactNode }) {
+  // Start with DEFAULT_STATE on first render (SSR-safe), then hydrate from
+  // localStorage in the effect below. Two-phase init avoids hydration mismatch.
+  const [state, dispatch] = useReducer(cartReducer, DEFAULT_STATE);
+
+  // Phase 1 — hydrate from localStorage after first mount
+  useEffect(() => {
+    const persisted = loadFromStorage();
+    if (persisted.items.length > 0 || persisted.mode !== 'delivery') {
+      dispatch({ type: 'HYDRATE', state: persisted });
+    }
+  }, []);
+
+  // Phase 2 — persist every state change
+  useEffect(() => {
+    saveToStorage(state);
+  }, [state]);
+
+  const subtotal    = state.items.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
   const deliveryFee = state.mode === 'delivery' && subtotal > 0 ? DELIVERY_FEE : 0;
 
   const value: CartContextValue = {
-    items: state.items,
-    mode: state.mode,
+    items:           state.items,
+    mode:            state.mode,
     deliveryAddress: state.deliveryAddress,
-    itemCount: state.items.reduce((n, i) => n + i.qty, 0),
+    itemCount:       state.items.reduce((n, i) => n + i.qty, 0),
     subtotal,
     deliveryFee,
-    total: subtotal + deliveryFee,
-    addItem: (item) => dispatch({ type: 'ADD_ITEM', item }),
-    removeItem: (id) => dispatch({ type: 'REMOVE_ITEM', id }),
-    updateQty: (id, qty) => dispatch({ type: 'UPDATE_QTY', id, qty }),
-    clear: () => dispatch({ type: 'CLEAR' }),
-    setMode: (mode) => dispatch({ type: 'SET_MODE', mode }),
+    total:           subtotal + deliveryFee,
+    addItem:            (item)    => dispatch({ type: 'ADD_ITEM',    item }),
+    removeItem:         (id)      => dispatch({ type: 'REMOVE_ITEM', id }),
+    updateQty:          (id, qty) => dispatch({ type: 'UPDATE_QTY',  id, qty }),
+    clear:              ()        => dispatch({ type: 'CLEAR' }),
+    setMode:            (mode)    => dispatch({ type: 'SET_MODE',    mode }),
     setDeliveryAddress: (address) => dispatch({ type: 'SET_ADDRESS', address }),
   };
 

@@ -16,11 +16,15 @@ interface Props {
 type Step = 'cart' | 'checkout' | 'processing';
 
 export default function CartSidebar({ open, onClose }: Props) {
-  const { items, subtotal, deliveryFee, total, mode, updateQty, removeItem, setMode, clear: clearCart } = useCart();
-  const [step, setStep] = useState<Step>('cart');
-  const [error, setError] = useState('');
+  const { items, subtotal, deliveryFee, total, mode, updateQty, removeItem, setMode } = useCart();
+  const [step, setStep]               = useState<Step>('cart');
+  const [error, setError]             = useState('');
+  const [form, setForm]               = useState({ name: '', email: '', phone: '' });
 
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  // Holds the orderId once an order is successfully created.
+  // On retry after a payment-init failure, this prevents a second order being created
+  // for the same cart — we skip straight to initialising payment with the existing id.
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const effectiveTotal = mode === 'delivery' ? (subtotal >= 5000 ? subtotal : total) : subtotal;
   const effectiveFee   = mode === 'delivery' ? (subtotal >= 5000 ? 0 : deliveryFee) : 0;
@@ -36,13 +40,13 @@ export default function CartSidebar({ open, onClose }: Props) {
           placeholder={placeholder}
           required
           style={{
-            padding: '12px 14px',
+            padding:      '12px 14px',
             borderRadius: '8px',
-            border: '2px solid rgba(26,16,8,0.15)',
-            background: 'var(--egusi-cream)',
-            fontSize: '14px',
-            color: 'var(--suya-smoke)',
-            outline: 'none',
+            border:       '2px solid rgba(26,16,8,0.15)',
+            background:   'var(--egusi-cream)',
+            fontSize:     '14px',
+            color:        'var(--suya-smoke)',
+            outline:      'none',
           }}
           onFocus={(e) => (e.target.style.border = '2px solid var(--palm-oil)')}
           onBlur={(e)  => (e.target.style.border = '2px solid rgba(26,16,8,0.15)')}
@@ -57,30 +61,37 @@ export default function CartSidebar({ open, onClose }: Props) {
     setStep('processing');
 
     try {
-      // 1 — create order
-      const orderRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer: { name: form.name, email: form.email, phone: form.phone },
-          items: items.map((i) => ({ name: i.menuItem.name, qty: i.qty, unitPrice: i.unitPrice })),
-          subtotal,
-          deliveryFee: effectiveFee,
-          total: effectiveTotal,
-          fulfillmentMode: mode,
-        }),
-      });
+      // ── Step 1: Create order (skip if already created from a prior attempt) ──
+      let orderId = pendingOrderId;
 
-      const orderData = await orderRes.json();
-      if (!orderRes.ok) throw new Error(orderData.error ?? 'Failed to create order');
+      if (!orderId) {
+        const orderRes = await fetch('/api/orders', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer:        { name: form.name, email: form.email, phone: form.phone },
+            items:           items.map((i) => ({ name: i.menuItem.name, qty: i.qty, unitPrice: i.unitPrice })),
+            subtotal,
+            deliveryFee:     effectiveFee,
+            total:           effectiveTotal,
+            fulfillmentMode: mode,
+          }),
+        });
 
-      // 2 — initialize Paystack
+        const orderData = await orderRes.json();
+        if (!orderRes.ok) throw new Error(orderData.error ?? 'Failed to create order');
+
+        orderId = orderData.orderId as string;
+        setPendingOrderId(orderId); // persist so retries reuse the same order
+      }
+
+      // ── Step 2: Initialise Paystack payment ───────────────────────────────
       const payRes = await fetch('/api/payments/initialize', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: orderData.orderId,
-          email: form.email,
+          orderId,
+          email:      form.email,
           amountKobo: effectiveTotal * 100,
         }),
       });
@@ -88,9 +99,11 @@ export default function CartSidebar({ open, onClose }: Props) {
       const payData = await payRes.json();
       if (!payRes.ok) throw new Error(payData.error ?? 'Payment init failed');
 
-      // 3 — redirect to Paystack
-      clearCart();
+      // ── Step 3: Redirect to Paystack ──────────────────────────────────────
+      // Cart is cleared by the callback page only after payment is confirmed,
+      // so the user keeps their items if they cancel or close Paystack.
       window.location.href = payData.authorizationUrl;
+
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
       setError(msg);
@@ -98,7 +111,19 @@ export default function CartSidebar({ open, onClose }: Props) {
     }
   }
 
-  const handleClose = () => { setStep('cart'); setError(''); onClose(); };
+  function handleClose() {
+    setStep('cart');
+    setError('');
+    onClose();
+  }
+
+  // Reset pendingOrderId when user explicitly goes back to cart to change items.
+  // A cart change means a new order must be created.
+  function handleBackToCart() {
+    setPendingOrderId(null);
+    setStep('cart');
+    setError('');
+  }
 
   return (
     <>
@@ -111,18 +136,18 @@ export default function CartSidebar({ open, onClose }: Props) {
 
       <aside
         style={{
-          position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: 'min(440px, 100vw)',
+          position:   'fixed',
+          top:        0,
+          right:      0,
+          bottom:     0,
+          width:      'min(440px, 100vw)',
           background: 'var(--ash-white)',
-          zIndex: 100,
-          display: 'flex',
+          zIndex:     100,
+          display:    'flex',
           flexDirection: 'column',
-          transform: open ? 'translateX(0)' : 'translateX(100%)',
+          transform:  open ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s ease',
-          boxShadow: open ? '-8px 0 40px rgba(196,82,26,0.15)' : 'none',
+          boxShadow:  open ? '-8px 0 40px rgba(196,82,26,0.15)' : 'none',
         }}
       >
         {/* Header */}
@@ -151,7 +176,7 @@ export default function CartSidebar({ open, onClose }: Props) {
                     style={{
                       flex: 1, padding: '10px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
                       background: mode === m ? 'var(--palm-oil)' : 'transparent',
-                      color: mode === m ? 'var(--ash-white)' : 'var(--suya-smoke)',
+                      color:      mode === m ? 'var(--ash-white)' : 'var(--suya-smoke)',
                       transition: 'all 0.2s', textTransform: 'capitalize',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     }}
@@ -182,13 +207,19 @@ export default function CartSidebar({ open, onClose }: Props) {
                   <div className="flex items-center gap-1">
                     {(['−', '+'] as const).map((btn) => (
                       <button key={btn}
-                        onClick={() => updateQty(item.id, btn === '−' ? item.qty - 1 : item.qty + 1)}
+                        onClick={() => {
+                          updateQty(item.id, btn === '−' ? item.qty - 1 : item.qty + 1);
+                          setPendingOrderId(null); // cart changed — invalidate pending order
+                        }}
                         style={{ width: '28px', height: '28px', borderRadius: '6px', border: '1.5px solid rgba(196,82,26,0.3)', background: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--palm-oil)', fontSize: '16px', lineHeight: 1 }}
                       >{btn}</button>
                     ))}
                     <span style={{ width: '24px', textAlign: 'center', fontWeight: 700, fontSize: '14px' }}>{item.qty}</span>
                   </div>
-                  <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stew-red)', opacity: 0.7, padding: '4px' }}>
+                  <button
+                    onClick={() => { removeItem(item.id); setPendingOrderId(null); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--stew-red)', opacity: 0.7, padding: '4px' }}
+                  >
                     <Trash size={16} />
                   </button>
                 </div>
@@ -206,7 +237,9 @@ export default function CartSidebar({ open, onClose }: Props) {
                   <div className="flex justify-between text-sm" style={{ color: 'var(--suya-smoke)', opacity: 0.7 }}>
                     <span className="flex items-center gap-1.5"><Motorcycle size={14} /> Delivery</span>
                     <span style={{ fontFamily: 'var(--font-price)' }}>
-                      {subtotal >= 5000 ? <><s style={{ opacity: 0.5 }}>{formatPrice(deliveryFee)}</s> <span style={{ color: 'var(--palm-oil)' }}>FREE</span></> : formatPrice(deliveryFee)}
+                      {subtotal >= 5000
+                        ? <><s style={{ opacity: 0.5 }}>{formatPrice(deliveryFee)}</s> <span style={{ color: 'var(--palm-oil)' }}>FREE</span></>
+                        : formatPrice(deliveryFee)}
                     </span>
                   </div>
                 )}
@@ -226,7 +259,7 @@ export default function CartSidebar({ open, onClose }: Props) {
           </>
         )}
 
-        {/* ── CHECKOUT STEP ── */}
+        {/* ── CHECKOUT / PROCESSING STEP ── */}
         {(step === 'checkout' || step === 'processing') && (
           <form onSubmit={handleCheckout} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
             <div style={{ flex: 1, padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -262,7 +295,7 @@ export default function CartSidebar({ open, onClose }: Props) {
 
               <button
                 type="button"
-                onClick={() => { setStep('cart'); setError(''); }}
+                onClick={handleBackToCart}
                 disabled={step === 'processing'}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--suya-smoke)', opacity: 0.55, fontSize: '13px', textDecoration: 'underline' }}
               >
