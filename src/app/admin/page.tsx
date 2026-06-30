@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Package, CheckCircle, XCircle, Motorcycle, Storefront, ArrowClockwise, SignOut, WhatsappLogo } from '@phosphor-icons/react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Package, CheckCircle, XCircle, Motorcycle, Storefront, ArrowClockwise, SignOut, WhatsappLogo, Bell } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
+
+const POLL_INTERVAL = 30_000; // 30 seconds
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; next?: string }> = {
   pending:          { label: 'Received',    bg: '#FFF3CD', color: '#856404', next: 'confirmed' },
@@ -33,25 +35,51 @@ interface Order {
 
 export default function AdminPage() {
   const router = useRouter();
-  const [orders, setOrders]     = useState<Order[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState('all');
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [error, setError]       = useState('');
+  const [orders, setOrders]       = useState<Order[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [filter, setFilter]       = useState('all');
+  const [updating, setUpdating]   = useState<string | null>(null);
+  const [error, setError]         = useState('');
+  const [newCount, setNewCount]   = useState(0);
+  const knownIdsRef               = useRef<Set<string>>(new Set());
+  const isFirstFetch              = useRef(true);
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     const params = filter !== 'all' ? `?status=${filter}` : '';
     const res = await fetch(`/api/admin/orders${params}`);
     if (res.status === 401) { router.replace('/admin/login'); return; }
-    const data = await res.json();
-    if (res.ok) setOrders(data);
-    else setError(data.error ?? 'Failed to load orders');
-    setLoading(false);
+    const data: Order[] = await res.json();
+    if (res.ok) {
+      setOrders(data);
+      if (isFirstFetch.current) {
+        // seed known IDs on first load — don't alert for existing orders
+        knownIdsRef.current = new Set(data.map((o) => o.id));
+        isFirstFetch.current = false;
+      } else {
+        const fresh = data.filter((o) => !knownIdsRef.current.has(o.id));
+        if (fresh.length > 0) {
+          fresh.forEach((o) => knownIdsRef.current.add(o.id));
+          setNewCount((c) => c + fresh.length);
+          document.title = `(${fresh.length} new) Chop & Drop Admin`;
+          setTimeout(() => { document.title = 'Chop & Drop Admin'; }, 8_000);
+        }
+      }
+    } else {
+      setError((data as { error?: string }).error ?? 'Failed to load orders');
+    }
+    if (!silent) setLoading(false);
   }, [filter, router]);
 
+  // Initial load
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  // Background polling
+  useEffect(() => {
+    const id = setInterval(() => fetchOrders(true), POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [fetchOrders]);
 
   async function updateStatus(orderId: string, status: string) {
     setUpdating(orderId);
@@ -90,7 +118,7 @@ export default function AdminPage() {
           <span style={{ fontSize: '13px', color: 'var(--ash-white)', opacity: 0.5, marginLeft: '10px' }}>Admin</span>
         </div>
         <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-          <button onClick={fetchOrders} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ash-white)', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
+          <button onClick={() => fetchOrders()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ash-white)', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
             <ArrowClockwise size={14} /> Refresh
           </button>
           <button onClick={handleLogout} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ash-white)', opacity: 0.7, display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px' }}>
@@ -98,6 +126,17 @@ export default function AdminPage() {
           </button>
         </div>
       </div>
+
+      {/* New-order banner */}
+      {newCount > 0 && (
+        <div style={{ background: '#25a244', color: '#fff', padding: '10px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '14px' }}>
+            <Bell size={16} weight="fill" />
+            {newCount} new order{newCount > 1 ? 's' : ''} arrived!
+          </span>
+          <button onClick={() => setNewCount(0)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', fontSize: '18px', lineHeight: 1, opacity: 0.8 }}>×</button>
+        </div>
+      )}
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
         {/* Stats */}
