@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase, supabaseReady } from '@/lib/supabase';
+import { emailOrderReceived, emailNewOrderAdmin } from '@/lib/email';
 
 export const runtime = 'edge';
 
@@ -82,6 +83,11 @@ export async function POST(req: NextRequest) {
       console.error('[orders] order_items insert error:', itemsErr);
       return NextResponse.json({ error: supabaseErr(itemsErr) }, { status: 500 });
     }
+
+    // Fire emails — non-blocking so errors don't fail the order response
+    const emailItems = orderItems.map(i => ({ item_name: i.item_name, qty: i.qty, unit_price: i.unit_price }));
+    void emailOrderReceived({ email, name, orderId: order.id, items: emailItems, total: order.total, mode: fulfillmentMode ?? 'delivery' });
+    void emailNewOrderAdmin({ orderId: order.id, customerName: name, customerEmail: email, customerPhone: phone, items: emailItems, total: order.total, mode: fulfillmentMode ?? 'delivery' });
 
     return NextResponse.json({ orderId: order.id, total: order.total });
   } catch (err: unknown) {

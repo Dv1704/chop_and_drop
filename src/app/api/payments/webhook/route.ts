@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { notifyCustomer, notifyRestaurant } from '@/lib/whatsapp';
+import { emailPaymentConfirmed, emailPaymentAdminAlert } from '@/lib/email';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
@@ -69,10 +70,10 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (order) {
-      const cust  = order.customers  as unknown as { name: string; phone: string } | null;
+      const cust  = order.customers  as unknown as { name: string; phone: string; email: string } | null;
       const items = (order.order_items ?? []) as Array<{ item_name: string; qty: number; unit_price: number }>;
 
-      // Notify customer on their phone
+      // WhatsApp — notify customer + restaurant
       if (cust?.phone) {
         await notifyCustomer({
           phone:   cust.phone,
@@ -83,8 +84,6 @@ export async function POST(req: NextRequest) {
           mode:    order.fulfillment_mode,
         });
       }
-
-      // Notify restaurant owner
       await notifyRestaurant({
         orderId:       order.id,
         customerName:  cust?.name  ?? 'Unknown',
@@ -92,6 +91,25 @@ export async function POST(req: NextRequest) {
         items,
         total: order.total,
         mode:  order.fulfillment_mode,
+      });
+
+      // Email — notify customer + admin
+      if (cust?.email) {
+        await emailPaymentConfirmed({
+          email:   cust.email,
+          name:    cust.name,
+          orderId: order.id,
+          items,
+          total:   order.total,
+          mode:    order.fulfillment_mode,
+        });
+      }
+      await emailPaymentAdminAlert({
+        orderId:       order.id,
+        customerName:  cust?.name  ?? 'Unknown',
+        customerEmail: cust?.email ?? '',
+        total:         order.total,
+        mode:          order.fulfillment_mode,
       });
     }
 

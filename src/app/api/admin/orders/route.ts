@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken, cookieName } from '@/lib/adminAuth';
 import { supabase } from '@/lib/supabase';
+import { emailStatusUpdate } from '@/lib/email';
 
 export const runtime = 'edge';
 
@@ -26,6 +27,18 @@ export async function PATCH(req: NextRequest) {
     .eq('id', orderId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Email the customer about the status change (fire and forget)
+  const { data: order } = await supabase
+    .from('orders')
+    .select('customers(name, email)')
+    .eq('id', orderId)
+    .single();
+  const cust = order?.customers as { name: string; email: string } | null;
+  if (cust?.email) {
+    void emailStatusUpdate({ email: cust.email, name: cust.name, orderId, status });
+  }
+
   return NextResponse.json({ ok: true });
 }
 
