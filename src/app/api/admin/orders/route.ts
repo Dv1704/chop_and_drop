@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest) {
     .single();
   const cust = order?.customers as unknown as { name: string; email: string } | null;
   if (cust?.email) {
-    void emailStatusUpdate({ email: cust.email, name: cust.name, orderId, status });
+    await emailStatusUpdate({ email: cust.email, name: cust.name, orderId, status });
   }
 
   return NextResponse.json({ ok: true });
