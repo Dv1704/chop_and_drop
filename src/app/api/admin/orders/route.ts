@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest) {
     .select('customers(name, email)')
     .eq('id', orderId)
     .single();
-  const cust = order?.customers as { name: string; email: string } | null;
+  const cust = order?.customers as unknown as { name: string; email: string } | null;
   if (cust?.email) {
     void emailStatusUpdate({ email: cust.email, name: cust.name, orderId, status });
   }
