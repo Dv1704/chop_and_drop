@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState, ReactNode } from 'react';
 import { CartItem, MenuItem, FulfillmentMode } from '@/types';
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -147,12 +147,15 @@ interface CartContextValue {
   subtotal:           number;
   deliveryFee:        number;
   total:              number;
+  isOpen:             boolean;
   addItem:            (item: MenuItem) => void;
   removeItem:         (id: string) => void;
   updateQty:          (id: string, qty: number) => void;
   clear:              () => void;
   setMode:            (mode: FulfillmentMode) => void;
   setDeliveryAddress: (address: string) => void;
+  openCart:           () => void;
+  closeCart:          () => void;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -163,6 +166,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Start with DEFAULT_STATE on first render (SSR-safe), then hydrate from
   // localStorage in the effect below. Two-phase init avoids hydration mismatch.
   const [state, dispatch] = useReducer(cartReducer, DEFAULT_STATE);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Phase 1 — hydrate from localStorage after first mount
   useEffect(() => {
@@ -188,12 +192,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     subtotal,
     deliveryFee,
     total:           subtotal + deliveryFee,
-    addItem:            (item)    => dispatch({ type: 'ADD_ITEM',    item }),
+    isOpen,
+    // Adding an item brings the cart into focus, mirroring the reference
+    // flow where the order panel updates and shows itself immediately.
+    addItem:            (item)    => { dispatch({ type: 'ADD_ITEM', item }); setIsOpen(true); },
     removeItem:         (id)      => dispatch({ type: 'REMOVE_ITEM', id }),
     updateQty:          (id, qty) => dispatch({ type: 'UPDATE_QTY',  id, qty }),
     clear:              ()        => dispatch({ type: 'CLEAR' }),
     setMode:            (mode)    => dispatch({ type: 'SET_MODE',    mode }),
     setDeliveryAddress: (address) => dispatch({ type: 'SET_ADDRESS', address }),
+    openCart:           () => setIsOpen(true),
+    closeCart:          () => setIsOpen(false),
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

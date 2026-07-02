@@ -8,15 +8,10 @@ function formatPrice(n: number) {
   return `₦${n.toLocaleString('en-NG')}`;
 }
 
-interface Props {
-  open: boolean;
-  onClose: () => void;
-}
-
 type Step = 'cart' | 'checkout' | 'processing';
 
-export default function CartSidebar({ open, onClose }: Props) {
-  const { items, subtotal, deliveryFee, total, mode, updateQty, removeItem, setMode } = useCart();
+export default function CartSidebar() {
+  const { items, subtotal, deliveryFee, total, mode, updateQty, removeItem, setMode, isOpen, closeCart } = useCart();
   const [step, setStep]               = useState<Step>('cart');
   const [error, setError]             = useState('');
   const [form, setForm]               = useState({ name: '', email: '', phone: '' });
@@ -114,7 +109,7 @@ export default function CartSidebar({ open, onClose }: Props) {
   function handleClose() {
     setStep('cart');
     setError('');
-    onClose();
+    closeCart();
   }
 
   // Reset pendingOrderId when user explicitly goes back to cart to change items.
@@ -127,7 +122,7 @@ export default function CartSidebar({ open, onClose }: Props) {
 
   return (
     <>
-      {open && (
+      {isOpen && (
         <div
           onClick={handleClose}
           style={{ position: 'fixed', inset: 0, background: 'rgba(26,16,8,0.55)', zIndex: 90 }}
@@ -145,9 +140,9 @@ export default function CartSidebar({ open, onClose }: Props) {
           zIndex:     100,
           display:    'flex',
           flexDirection: 'column',
-          transform:  open ? 'translateX(0)' : 'translateX(100%)',
+          transform:  isOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s ease',
-          boxShadow:  open ? '-8px 0 40px rgba(196,82,26,0.15)' : 'none',
+          boxShadow:  isOpen ? '-8px 0 40px rgba(196,82,26,0.15)' : 'none',
         }}
       >
         {/* Header */}

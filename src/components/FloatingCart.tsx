@@ -1,18 +1,16 @@
 'use client';
 
-import { useState } from 'react';
 import { useCart } from '@/context/CartContext';
 import CartSidebar from './CartSidebar';
 
 export default function FloatingCart() {
-  const [open, setOpen] = useState(false);
-  const { itemCount, total } = useCart();
+  const { itemCount, total, openCart } = useCart();
 
   return (
     <>
       {itemCount > 0 && (
         <button
-          onClick={() => setOpen(true)}
+          onClick={openCart}
           style={{
             position: 'fixed',
             bottom: '28px',
@@ -56,7 +54,7 @@ export default function FloatingCart() {
         </button>
       )}
 
-      <CartSidebar open={open} onClose={() => setOpen(false)} />
+      <CartSidebar />
     </>
   );
 }

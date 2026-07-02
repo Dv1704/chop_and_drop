@@ -36,7 +36,7 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
             src={item.imageUrl}
             alt={item.name}
             fill
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            sizes="33vw"
             style={{ objectFit: 'cover', transition: 'transform 0.35s ease' }}
             className="menu-card-img"
           />
@@ -128,10 +128,16 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
   );
 }
 
+// Keeps the grid at full rows of 3 — trims any trailing 1-2 items that would
+// otherwise leave an incomplete last row.
+function fullRowsOfThree<T>(list: T[]): T[] {
+  return list.slice(0, Math.floor(list.length / 3) * 3);
+}
+
 export default function MenuSection() {
   const [activeCategory, setActiveCategory] = useState<string | 'top'>('top');
   const topPicks = getTopPicks();
-  const items = activeCategory === 'top' ? topPicks : getItemsByCategory(activeCategory);
+  const items = fullRowsOfThree(activeCategory === 'top' ? topPicks : getItemsByCategory(activeCategory));
 
   const tabs = [{ id: 'top', name: 'Top Picks' }, ...categories];
 
@@ -149,8 +155,8 @@ export default function MenuSection() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {topPicks.slice(0, 6).map((item, i) => (
+          <div className="grid grid-cols-3 gap-3 sm:gap-5 lg:gap-8">
+            {fullRowsOfThree(topPicks).slice(0, 6).map((item, i) => (
               <MenuCard key={item.id} item={item} featured={i === 1} />
             ))}
           </div>
@@ -197,7 +203,7 @@ export default function MenuSection() {
           </div>
 
           {/* Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-3 sm:gap-5 lg:gap-8">
             {items.map((item, i) => (
               <MenuCard key={item.id} item={item} featured={activeCategory !== 'top' && i === 0} />
             ))}
