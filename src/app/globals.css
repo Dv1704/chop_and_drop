@@ -67,6 +67,9 @@ body {
 }
 @media (min-width: 1024px) {
   .container { padding: 0 48px; }
+  /* Reserves room for the persistent cart dock (CartDock) so it never
+     overlaps page content once an item is added, on desktop only. */
+  html.has-cart-dock .container { padding-right: 428px; }
 }
 @media (max-width: 768px) {
   .container { padding: 0 20px; }

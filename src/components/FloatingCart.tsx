@@ -11,6 +11,7 @@ export default function FloatingCart() {
       {itemCount > 0 && (
         <button
           onClick={openCart}
+          className="lg:hidden"
           style={{
             position: 'fixed',
             bottom: '28px',

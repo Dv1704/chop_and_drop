@@ -8,6 +8,7 @@ import Testimonials from '@/components/Testimonials';
 import Footer from '@/components/Footer';
 import AiChat from '@/components/AiChat';
 import FloatingCart from '@/components/FloatingCart';
+import CartDock from '@/components/CartDock';
 
 export default function HomePage() {
   return (
@@ -23,6 +24,7 @@ export default function HomePage() {
       </main>
       <Footer />
       <FloatingCart />
+      <CartDock />
       <AiChat />
     </>
   );
