@@ -194,9 +194,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     deliveryFee,
     total:           subtotal + deliveryFee,
     isOpen,
-    // Adding an item brings the cart into focus, mirroring the reference
-    // flow where the order panel updates and shows itself immediately.
-    addItem:            (item, qty = 1) => { dispatch({ type: 'ADD_ITEM', item, qty }); setIsOpen(true); },
+    // Adding an item just updates the cart in place (docked panel on desktop,
+    // bottom bar on mobile) — it no longer forces the drawer open, since that
+    // interrupted browsing when adding several items in a row.
+    addItem:            (item, qty = 1) => dispatch({ type: 'ADD_ITEM', item, qty }),
     removeItem:         (id)      => dispatch({ type: 'REMOVE_ITEM', id }),
     updateQty:          (id, qty) => dispatch({ type: 'UPDATE_QTY',  id, qty }),
     clear:              ()        => dispatch({ type: 'CLEAR' }),
