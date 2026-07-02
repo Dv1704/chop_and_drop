@@ -80,7 +80,7 @@ interface CartState {
 
 type CartAction =
   | { type: 'HYDRATE';      state: CartState }
-  | { type: 'ADD_ITEM';     item: MenuItem }
+  | { type: 'ADD_ITEM';     item: MenuItem; qty?: number }
   | { type: 'REMOVE_ITEM';  id: string }
   | { type: 'UPDATE_QTY';   id: string; qty: number }
   | { type: 'CLEAR' }
@@ -94,12 +94,13 @@ function cartReducer(state: CartState, action: CartAction): CartState {
       return action.state;
 
     case 'ADD_ITEM': {
+      const qty = action.qty ?? 1;
       const existing = state.items.find((i) => i.menuItem.id === action.item.id);
       if (existing) {
         return {
           ...state,
           items: state.items.map((i) =>
-            i.menuItem.id === action.item.id ? { ...i, qty: i.qty + 1 } : i
+            i.menuItem.id === action.item.id ? { ...i, qty: i.qty + qty } : i
           ),
         };
       }
@@ -107,7 +108,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
         ...state,
         items: [
           ...state.items,
-          { id: crypto.randomUUID(), menuItem: action.item, qty: 1, unitPrice: action.item.price },
+          { id: crypto.randomUUID(), menuItem: action.item, qty, unitPrice: action.item.price },
         ],
       };
     }
@@ -148,7 +149,7 @@ interface CartContextValue {
   deliveryFee:        number;
   total:              number;
   isOpen:             boolean;
-  addItem:            (item: MenuItem) => void;
+  addItem:            (item: MenuItem, qty?: number) => void;
   removeItem:         (id: string) => void;
   updateQty:          (id: string, qty: number) => void;
   clear:              () => void;
@@ -195,7 +196,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     isOpen,
     // Adding an item brings the cart into focus, mirroring the reference
     // flow where the order panel updates and shows itself immediately.
-    addItem:            (item)    => { dispatch({ type: 'ADD_ITEM', item }); setIsOpen(true); },
+    addItem:            (item, qty = 1) => { dispatch({ type: 'ADD_ITEM', item, qty }); setIsOpen(true); },
     removeItem:         (id)      => dispatch({ type: 'REMOVE_ITEM', id }),
     updateQty:          (id, qty) => dispatch({ type: 'UPDATE_QTY',  id, qty }),
     clear:              ()        => dispatch({ type: 'CLEAR' }),

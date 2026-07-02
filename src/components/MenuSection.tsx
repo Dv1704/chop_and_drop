@@ -4,23 +4,14 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { Star, PlusCircle, Fire, Heart } from '@phosphor-icons/react';
 import { categories, getItemsByCategory, getTopPicks } from '@/lib/menu-data';
-import { useCart } from '@/context/CartContext';
 import { MenuItem } from '@/types';
+import ItemModal from './ItemModal';
 
 function formatPrice(n: number) {
   return `₦${n.toLocaleString('en-NG')}`;
 }
 
-function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
-  const { addItem } = useCart();
-  const [added, setAdded] = useState(false);
-
-  function handleAdd() {
-    addItem(item);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1200);
-  }
-
+function MenuCard({ item, featured, onSelect }: { item: MenuItem; featured?: boolean; onSelect: (item: MenuItem) => void }) {
   return (
     <div
       className="card flex flex-col overflow-hidden"
@@ -102,7 +93,7 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
           {formatPrice(item.price)}
         </span>
         <button
-          onClick={handleAdd}
+          onClick={() => onSelect(item)}
           disabled={!item.isAvailable}
           aria-label={`Add ${item.name} to cart`}
           style={{
@@ -110,7 +101,7 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
             alignItems: 'center',
             gap: '6px',
             padding: '8px 14px',
-            background: added ? 'var(--plantain-gold)' : 'var(--stew-red)',
+            background: 'var(--stew-red)',
             color: 'var(--ash-white)',
             border: 'none',
             borderRadius: '8px',
@@ -121,7 +112,7 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
           }}
         >
           <PlusCircle size={15} weight="bold" />
-          {added ? 'Added!' : 'Add'}
+          Add
         </button>
       </div>
     </div>
@@ -136,6 +127,7 @@ function fullRowsOfThree<T>(list: T[]): T[] {
 
 export default function MenuSection() {
   const [activeCategory, setActiveCategory] = useState<string | 'top'>('top');
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const topPicks = getTopPicks();
   const items = fullRowsOfThree(activeCategory === 'top' ? topPicks : getItemsByCategory(activeCategory));
 
@@ -157,7 +149,7 @@ export default function MenuSection() {
 
           <div className="grid grid-cols-3 gap-3 sm:gap-5 lg:gap-8">
             {fullRowsOfThree(topPicks).slice(0, 6).map((item, i) => (
-              <MenuCard key={item.id} item={item} featured={i === 1} />
+              <MenuCard key={item.id} item={item} featured={i === 1} onSelect={setSelectedItem} />
             ))}
           </div>
         </div>
@@ -205,11 +197,13 @@ export default function MenuSection() {
           {/* Grid */}
           <div className="grid grid-cols-3 gap-3 sm:gap-5 lg:gap-8">
             {items.map((item, i) => (
-              <MenuCard key={item.id} item={item} featured={activeCategory !== 'top' && i === 0} />
+              <MenuCard key={item.id} item={item} featured={activeCategory !== 'top' && i === 0} onSelect={setSelectedItem} />
             ))}
           </div>
         </div>
       </section>
+
+      <ItemModal item={selectedItem} onClose={() => setSelectedItem(null)} />
     </>
   );
 }
