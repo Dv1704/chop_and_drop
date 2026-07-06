@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Star, PlusCircle, Fire, Heart } from '@phosphor-icons/react';
-import { categories, getItemsByCategory, getTopPicks } from '@/lib/menu-data';
 import { useCart } from '@/context/CartContext';
-import { MenuItem } from '@/types';
+import { MenuCategory, MenuItem } from '@/types';
 
 function formatPrice(n: number) {
   return `₦${n.toLocaleString('en-NG')}`;
@@ -128,16 +127,62 @@ function MenuCard({ item, featured }: { item: MenuItem; featured?: boolean }) {
   );
 }
 
-// Keeps the grid at full rows of 3 — trims any trailing 1-2 items that would
-// otherwise leave an incomplete last row.
+// Keeps the grid at full rows of 3, trimming any trailing 1-2 items that
+// would otherwise leave an incomplete last row.
 function fullRowsOfThree<T>(list: T[]): T[] {
   return list.slice(0, Math.floor(list.length / 3) * 3);
 }
 
 export default function MenuSection() {
   const [activeCategory, setActiveCategory] = useState<string | 'top'>('top');
-  const topPicks = getTopPicks();
-  const items = fullRowsOfThree(activeCategory === 'top' ? topPicks : getItemsByCategory(activeCategory));
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [allItems, setAllItems] = useState<MenuItem[]>([]);
+  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/menu')
+      .then((res) => {
+        if (!res.ok) throw new Error(`api/menu returned ${res.status}`);
+        return res.json();
+      })
+      .then((data: { categories: MenuCategory[]; items: MenuItem[] }) => {
+        if (cancelled) return;
+        setCategories(data.categories);
+        setAllItems(data.items);
+        setStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (status === 'loading') {
+    return (
+      <section id="menu" className="py-24">
+        <div className="container text-center">Loading menu…</div>
+      </section>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <section id="menu" className="py-24">
+        <div className="container text-center">Sorry, we couldn't load the menu right now. Please refresh.</div>
+      </section>
+    );
+  }
+
+  const topPicks = allItems
+    .filter((item) => item.rating && item.rating >= 4.8)
+    .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+    .slice(0, 6);
+  const items = fullRowsOfThree(
+    activeCategory === 'top' ? topPicks : allItems.filter((i) => i.categoryId === activeCategory)
+  );
 
   const tabs = [{ id: 'top', name: 'Top Picks' }, ...categories];
 

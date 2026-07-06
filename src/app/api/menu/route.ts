@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { menuItems, categories, getItemsByCategory } from '@/lib/menu-data';
+import { getMenu } from '@/lib/menu-repo';
 
 export const runtime = 'edge';
 
@@ -9,7 +9,8 @@ export async function GET(req: NextRequest) {
   const search   = searchParams.get('q')?.toLowerCase();
   const dietary  = searchParams.get('dietary');
 
-  let items = category ? getItemsByCategory(category) : menuItems;
+  const { categories, items: allItems } = await getMenu();
+  let items = category ? allItems.filter((i) => i.categoryId === category) : allItems;
 
   if (search) {
     items = items.filter(

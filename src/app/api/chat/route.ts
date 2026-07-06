@@ -1,23 +1,27 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { menuItems, categories } from '@/lib/menu-data';
+import { getMenu } from '@/lib/menu-repo';
+import { MenuCategory, MenuItem } from '@/types';
 
 export const runtime = 'edge';
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const menuContext = categories
-  .map((cat) => {
-    const items = menuItems.filter((i) => i.categoryId === cat.id);
-    const lines = items.map(
-      (i) =>
-        `  - ${i.name} (₦${i.price.toLocaleString('en-NG')})${i.dietaryTags?.length ? ` [${i.dietaryTags.join(', ')}]` : ''}${i.allergens?.length ? ` | Allergens: ${i.allergens.join(', ')}` : ''}: ${i.description}`
-    );
-    return `${cat.name}:\n${lines.join('\n')}`;
-  })
-  .join('\n\n');
+function buildMenuContext(categories: MenuCategory[], menuItems: MenuItem[]): string {
+  return categories
+    .map((cat) => {
+      const items = menuItems.filter((i) => i.categoryId === cat.id);
+      const lines = items.map(
+        (i) =>
+          `  - ${i.name} (₦${i.price.toLocaleString('en-NG')})${i.dietaryTags?.length ? ` [${i.dietaryTags.join(', ')}]` : ''}${i.allergens?.length ? ` | Allergens: ${i.allergens.join(', ')}` : ''}: ${i.description}`
+      );
+      return `${cat.name}:\n${lines.join('\n')}`;
+    })
+    .join('\n\n');
+}
 
-const SYSTEM = `You are the friendly AI assistant for Chop & Drop, a Nigerian restaurant that delivers across Lagos and Abuja.
+function buildSystemPrompt(menuContext: string): string {
+  return `You are the friendly AI assistant for Chop & Drop, a Nigerian restaurant that delivers across Lagos and Abuja.
 You help customers with:
 1. Menu recommendations based on preferences, mood or dietary needs
 2. Dietary filtering — vegan, gluten-free, allergen-aware guidance
@@ -32,13 +36,19 @@ Current Menu:
 ${menuContext}
 
 Free delivery on orders above ₦5,000. Payment via Paystack.`;
+}
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
+  // Menu context is now a DB read per request. That adds a bit of latency
+  // and cost to every message, but it's intentional (see spec).
+  const { categories, items } = await getMenu();
+  const menuContext = buildMenuContext(categories, items);
+
   const result = await streamText({
     model: openai('gpt-4o'),
-    system: SYSTEM,
+    system: buildSystemPrompt(menuContext),
     messages,
     maxTokens: 400,
     temperature: 0.7,
