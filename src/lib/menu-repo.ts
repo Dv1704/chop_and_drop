@@ -31,12 +31,29 @@ function mapItem(row: Record<string, unknown>): MenuItem {
   };
 }
 
+// Menu/stock changes rarely, but every request was paying a full Supabase
+// round-trip (measured p95 of several seconds on live serverless traffic).
+// A short TTL cache absorbs that without meaningfully staling out stock
+// updates. Only successful DB reads are cached — never the static fallback,
+// so a real outage doesn't get "stuck" serving fallback data past a recovery.
+const CACHE_TTL_MS = 60_000;
+let cache: { data: MenuData; expiresAt: number } | null = null;
+
+// Test-only escape hatch — real callers never need to clear the cache mid-run.
+export function _clearMenuCache() {
+  cache = null;
+}
+
 // Reads menu/category data from Supabase, mapping DB snake_case columns to
 // the existing camelCase MenuItem/MenuCategory shape every consumer expects.
 // Falls back to the static file if Supabase isn't configured, or if a query
 // errors at runtime. This function must never throw.
 export async function getMenu(): Promise<MenuData> {
   if (!supabaseReady) return staticFallback();
+
+  if (cache && cache.expiresAt > Date.now()) {
+    return cache.data;
+  }
 
   const [categoriesRes, itemsRes] = await Promise.all([
     supabase.from('menu_categories').select('*').order('sort_order', { ascending: true }),
@@ -48,8 +65,10 @@ export async function getMenu(): Promise<MenuData> {
     return staticFallback();
   }
 
-  return {
+  const data: MenuData = {
     categories: (categoriesRes.data ?? []).map(mapCategory),
     items: (itemsRes.data ?? []).map(mapItem),
   };
+  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  return data;
 }

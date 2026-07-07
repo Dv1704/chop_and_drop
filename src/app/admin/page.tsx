@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Package, CheckCircle, XCircle, Motorcycle, Storefront, ArrowClockwise, SignOut, WhatsappLogo, Bell } from '@phosphor-icons/react';
 import { useRouter } from 'next/navigation';
+import StockList from '@/components/admin/StockList';
 
 const POLL_INTERVAL = 30_000; // 30 seconds
 
@@ -35,6 +36,7 @@ interface Order {
 
 export default function AdminPage() {
   const router = useRouter();
+  const [view, setView]           = useState<'orders' | 'menu'>('orders');
   const [orders, setOrders]       = useState<Order[]>([]);
   const [loading, setLoading]     = useState(true);
   const [filter, setFilter]       = useState('all');
@@ -139,6 +141,29 @@ export default function AdminPage() {
       )}
 
       <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '32px 24px' }}>
+        {/* View tabs */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          {(['orders', 'menu'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                padding: '8px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                fontSize: '14px', fontWeight: 700,
+                background: view === v ? 'var(--suya-smoke)' : 'var(--ash-white)',
+                color: view === v ? 'var(--ash-white)' : 'var(--suya-smoke)',
+                boxShadow: 'var(--shadow-card)',
+              }}
+            >
+              {v === 'orders' ? 'Orders' : 'Menu & Stock'}
+            </button>
+          ))}
+        </div>
+
+        {view === 'menu' ? (
+          <StockList />
+        ) : (
+        <>
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
           {[
@@ -240,6 +265,8 @@ export default function AdminPage() {
               );
             })}
           </div>
+        )}
+        </>
         )}
       </div>
     </main>

@@ -41,8 +41,8 @@ Free delivery on orders above ₦5,000. Payment via Paystack.`;
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // Menu context is now a DB read per request. That adds a bit of latency
-  // and cost to every message, but it's intentional (see spec).
+  // Menu context comes from getMenu(), which caches successful DB reads for
+  // a short TTL (see menu-repo.ts) rather than hitting Supabase every message.
   const { categories, items } = await getMenu();
   const menuContext = buildMenuContext(categories, items);
 

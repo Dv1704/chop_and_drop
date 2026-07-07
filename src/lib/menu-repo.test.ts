@@ -29,7 +29,7 @@ vi.mock('@/lib/menu-data', () => ({
   ],
 }));
 
-import { getMenu } from './menu-repo';
+import { getMenu, _clearMenuCache } from './menu-repo';
 
 function tableResult(rows: unknown[] | null, error: unknown = null) {
   return {
@@ -42,6 +42,10 @@ function tableResult(rows: unknown[] | null, error: unknown = null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // A short-TTL cache now sits in front of the Supabase reads (see menu-repo.ts).
+  // Clear it per test so each test's mock data is actually exercised, not
+  // masked by a previous test's cached result.
+  _clearMenuCache();
 });
 
 describe('getMenu', () => {
@@ -102,6 +106,38 @@ describe('getMenu', () => {
     const result = await getMenu();
     expect(result.items).toHaveLength(1);
     expect(result.items[0].isAvailable).toBe(false);
+  });
+
+  it('caches a successful read so a second call does not hit Supabase again', async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'menu_categories') return tableResult([{ id: 'cat-uuid-1', name: 'Local', sort_order: 1 }]);
+      if (table === 'menu_items') return tableResult([]);
+      throw new Error('unexpected table');
+    });
+
+    await getMenu();
+    const callsAfterFirst = mockSupabase.from.mock.calls.length;
+    await getMenu();
+
+    expect(mockSupabase.from.mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('never caches the static fallback, so an outage does not get stuck serving it', async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'menu_categories') return tableResult(null, { message: 'connection refused' });
+      return tableResult([]);
+    });
+
+    await getMenu(); // falls back, must not be cached
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'menu_categories') return tableResult([{ id: 'cat-uuid-1', name: 'Local', sort_order: 1 }]);
+      if (table === 'menu_items') return tableResult([]);
+      throw new Error('unexpected table');
+    });
+
+    const result = await getMenu(); // Supabase recovered, should hit it again, not reuse a cached fallback
+    expect(result.categories).toEqual([{ id: 'cat-uuid-1', name: 'Local', sortOrder: 1 }]);
   });
 
   it('falls back to the static file on a Supabase query error', async () => {
