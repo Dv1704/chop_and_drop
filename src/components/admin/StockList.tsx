@@ -89,6 +89,15 @@ export default function StockList() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--suya-smoke)' }}>{item.name}</span>
                       <span style={{ fontSize: '13px', color: 'var(--palm-oil)', fontWeight: 700 }}>{formatPrice(item.price)}</span>
+                      <span
+                        style={{
+                          fontSize: '11px', padding: '2px 10px', borderRadius: '999px', fontWeight: 700,
+                          background: item.isAvailable ? '#D4EDDA' : '#F8D7DA',
+                          color: item.isAvailable ? '#155724' : '#721C24',
+                        }}
+                      >
+                        {item.isAvailable ? 'In Stock' : 'Out of Stock'}
+                      </span>
                     </div>
                     <button
                       onClick={() => toggleAvailability(item)}

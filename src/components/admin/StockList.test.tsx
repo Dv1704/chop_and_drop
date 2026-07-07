@@ -34,6 +34,8 @@ describe('StockList', () => {
     expect(screen.getByText('Egusi Soup')).toBeInTheDocument();
     expect(screen.getByText('Mark unavailable')).toBeInTheDocument(); // Jollof is available
     expect(screen.getByText('Mark available')).toBeInTheDocument();   // Egusi is unavailable
+    expect(screen.getByText('In Stock')).toBeInTheDocument();     // Jollof's badge
+    expect(screen.getByText('Out of Stock')).toBeInTheDocument(); // Egusi's badge
   });
 
   it('toggling availability calls PATCH /api/admin/menu with the flipped value and updates the button label', async () => {
@@ -52,6 +54,7 @@ describe('StockList', () => {
       )
     );
     await waitFor(() => expect(screen.getAllByText('Mark available')).toHaveLength(2));
+    expect(screen.getAllByText('Out of Stock')).toHaveLength(2); // both items now unavailable
   });
 
   it('shows an error message if the fetch for the menu fails', async () => {
