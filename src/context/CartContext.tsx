@@ -17,10 +17,10 @@ function isValidMenuItem(v: unknown): v is MenuItem {
   if (!v || typeof v !== 'object') return false;
   const m = v as Record<string, unknown>;
   return (
-    typeof m.id       === 'string' && m.id.length > 0 &&
-    typeof m.name     === 'string' && m.name.length > 0 &&
-    typeof m.price    === 'number' && m.price >= 0 &&
-    typeof m.category === 'string'
+    typeof m.id         === 'string' && m.id.length > 0 &&
+    typeof m.name       === 'string' && m.name.length > 0 &&
+    typeof m.price      === 'number' && m.price >= 0 &&
+    typeof m.categoryId === 'string'
   );
 }
 
