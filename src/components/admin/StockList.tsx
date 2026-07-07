@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Package, CheckCircle, XCircle } from '@phosphor-icons/react';
 import { MenuCategory, MenuItem } from '@/types';
+import AddItemForm from './AddItemForm';
 
 function formatPrice(n: number) {
   return `₦${n.toLocaleString('en-NG')}`;
@@ -56,18 +57,16 @@ export default function StockList() {
     return <p style={{ color: 'var(--stew-red)', fontWeight: 600, padding: '20px' }}>{error}</p>;
   }
 
-  if (items.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '60px', background: 'var(--ash-white)', borderRadius: '16px' }}>
-        <Package size={40} style={{ color: 'var(--palm-oil)', margin: '0 auto 12px' }} />
-        <p style={{ fontWeight: 600, color: 'var(--suya-smoke)', opacity: 0.55 }}>No menu items found</p>
-      </div>
-    );
-  }
-
   return (
     <div>
+      {categories.length > 0 && <AddItemForm categories={categories} onAdded={fetchMenu} />}
       {error && <p style={{ color: 'var(--stew-red)', fontWeight: 600, marginBottom: '16px' }}>{error}</p>}
+      {items.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px', background: 'var(--ash-white)', borderRadius: '16px' }}>
+          <Package size={40} style={{ color: 'var(--palm-oil)', margin: '0 auto 12px' }} />
+          <p style={{ fontWeight: 600, color: 'var(--suya-smoke)', opacity: 0.55 }}>No menu items found</p>
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {categories.map((cat) => {
           const catItems = items.filter((i) => i.categoryId === cat.id);
@@ -113,6 +112,7 @@ export default function StockList() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
